@@ -1,0 +1,6 @@
+{
+    "resume_path":  "resumes",
+    "note":  "The public page reads this to build resume links. private_repo empty means no links are offered at all - a page that guesses a repo name would 404 in a way that looks like your data being lost.",
+    "private_repo":  "sarusarvesh993-cyber/sarvesh-jobsearch",
+    "board_repo":  "sarusarvesh993-cyber/sarvesh-job-board"
+}

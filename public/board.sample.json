@@ -1,0 +1,151 @@
+{
+ "generated": "2026-08-31 12:16 IST",
+ "schema": 1,
+ "applications": [
+  {
+   "date_applied": "2026-08-31",
+   "company": "Infosys",
+   "role": "GenAI Engineer",
+   "track": "ai",
+   "format": "uae",
+   "channel": "careers-page",
+   "coverage_pct": "84.0",
+   "fit_verdict": "BULLSEYE",
+   "fit_score": "8.4",
+   "resume_blob": "a/ce37399107"
+  },
+  {
+   "date_applied": "2026-08-31",
+   "company": "Dubai AI Labs",
+   "role": "ML Engineer",
+   "track": "ai",
+   "format": "uae",
+   "channel": "linkedin",
+   "status": "offer",
+   "last_touch": "2026-08-31",
+   "coverage_pct": "90.0",
+   "fit_verdict": "BULLSEYE",
+   "fit_score": "9.0",
+   "resume_blob": "a/c89e40990d"
+  },
+  {
+   "date_applied": "2026-08-30",
+   "company": "Zoho",
+   "role": "Backend + RAG Engineer",
+   "track": "ai",
+   "format": "india",
+   "channel": "referral",
+   "status": "screening",
+   "last_touch": "2026-08-31",
+   "coverage_pct": "93.0",
+   "fit_verdict": "BULLSEYE",
+   "fit_score": "9.3",
+   "resume_blob": "a/15000d4c04"
+  },
+  {
+   "date_applied": "2026-08-29",
+   "company": "Concentrix",
+   "role": "AI Support Engineer",
+   "track": "ai",
+   "format": "india",
+   "channel": "careers-page",
+   "status": "interview",
+   "last_touch": "2026-08-31",
+   "coverage_pct": "74.0",
+   "fit_verdict": "MIXED",
+   "fit_score": "7.4",
+   "resume_blob": "a/5da5f8b10a"
+  },
+  {
+   "date_applied": "2026-08-28",
+   "company": "Optum",
+   "role": "Sr AI Engineer",
+   "track": "hybrid",
+   "format": "india",
+   "channel": "careers-page",
+   "status": "applied",
+   "last_touch": "2026-08-30",
+   "coverage_pct": "91.0",
+   "fit_verdict": "BULLSEYE",
+   "fit_score": "9.1",
+   "resume_blob": "a/df96349c05"
+  },
+  {
+   "date_applied": "2026-08-25",
+   "company": "LTIMindtree",
+   "role": "AI Engineer",
+   "track": "ai",
+   "format": "india",
+   "channel": "naukri",
+   "status": "applied",
+   "last_touch": "2026-08-27",
+   "coverage_pct": "81.0",
+   "fit_verdict": "BULLSEYE",
+   "fit_score": "8.1",
+   "resume_blob": "a/44ca756d0b"
+  },
+  {
+   "date_applied": "2026-08-22",
+   "company": "Accenture",
+   "role": "GenAI Associate",
+   "track": "ai",
+   "format": "india",
+   "channel": "careers-page",
+   "status": "rejected",
+   "last_touch": "2026-08-24",
+   "coverage_pct": "88.0",
+   "fit_verdict": "BULLSEYE",
+   "fit_score": "8.8",
+   "resume_blob": "a/16f6110609"
+  },
+  {
+   "date_applied": "2026-08-20",
+   "company": "Tata 1mg",
+   "role": "Data Analyst",
+   "track": "data",
+   "format": "india",
+   "channel": "linkedin",
+   "status": "applied",
+   "last_touch": "2026-08-22",
+   "coverage_pct": "78.0",
+   "fit_verdict": "MIXED",
+   "fit_score": "7.8",
+   "resume_blob": "a/064f139e08"
+  },
+  {
+   "date_applied": "2026-08-14",
+   "company": "Wipro",
+   "role": "Data Analyst",
+   "track": "data",
+   "format": "india",
+   "channel": "naukri",
+   "status": "no-reply",
+   "last_touch": "2026-08-16",
+   "coverage_pct": "64.0",
+   "fit_verdict": "MIXED",
+   "fit_score": "6.4",
+   "resume_blob": "a/d2cd155905"
+  }
+ ],
+ "open_jobs_count": 4,
+ "pending": [
+  {
+   "company": "Infosys",
+   "role": "GenAI Engineer",
+   "verdict": "MIXED",
+   "coverage_pct": "64.0",
+   "format": "india",
+   "status": "awaiting approval",
+   "built": "2026-08-30T19:05:00"
+  },
+  {
+   "company": "Tata 1mg",
+   "role": "Data Analyst",
+   "verdict": "BULLSEYE",
+   "coverage_pct": "88.0",
+   "format": "india",
+   "status": "awaiting approval",
+   "built": "2026-08-31T09:12:00"
+  }
+ ]
+}

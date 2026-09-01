@@ -1,0 +1,3 @@
+# Hosted board page only. The laptop pipeline has its own requirements.txt;
+# this one is deliberately small because streamlit.app gives you ~1 CPU and 1 GB.
+streamlit>=1.40
