@@ -74,9 +74,10 @@ def _fetch(url: str) -> str:
 def _read_url(url: str) -> str:
     """One read per source per session, not per widget. The Refresh button clears this.
 
-    ttl=300 matches the publish cadence (4 runs a day), so the page cannot go
-    silently stale within a session and cannot hammer raw.githubusercontent.com
-    on every rerun either. The URL is an argument so the cache key is the source.
+    ttl=300 is bounded staleness, not a guess at a schedule: a laptop publish reaches the
+    page in about a minute, and a five-minute cache means the page cannot show a payload it
+    has already replaced, nor hammer raw.githubusercontent.com on every rerun. The URL is an
+    argument, so the cache key is the source.
     """
     return _fetch(url)
 
