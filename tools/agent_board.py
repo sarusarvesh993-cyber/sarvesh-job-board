@@ -197,6 +197,12 @@ def render(apps: list[dict], motion: bool = True, open_jobs: int | None = None,
             '<span>%d submitted</span>' % sent]
     if open_jobs is not None:
         foot.append('<span>%d open jobs found (list stays private)</span>' % open_jobs)
+    else:
+        # Absence, spelled. The payload carries null when the runner had no ledger to count, and
+        # this line used to say nothing at all while the tile under it printed a confident 0.
+        # Better to name the missing step, in the one sentence a reader scans for numbers.
+        foot.append('<span>open jobs: not counted in this payload - the laptop has not run '
+                    'tools\\publish_local.py --commit since the last scrape</span>')
     return ('<style>%s</style><div class="ab%s"><div class="grid">%s</div>'
             '<div class="foot">%s</div></div>'
             % (CSS, "" if motion else " still", "".join(cols), "".join(foot)))

@@ -31,6 +31,11 @@ import streamlit as st                                        # noqa: E402
 from tools import metrics                                   # noqa: E402
 from tools import agent_board                               # noqa: E402
 
+# The publisher stamps its payload IST (tools/redact_public.py) and this app runs in a container
+# whose clock is UTC, so every clock printed here is stamped in IST. Two zones on one screen is
+# how a payload that was two minutes old read as five and a half hours stale on 2026-09-02.
+IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
+
 # --- where the public page reads from. A path, or a URL. No credentials anywhere. ----
 # A previous build baked one GitHub login into these two defaults. It is correct for exactly one
 # person and silently wrong for everyone else: on streamlit.app a 404 used to mean "render
@@ -93,7 +98,7 @@ def load():
         # banner was one line he had to notice while the tiles looked like a busy week. A page
         # with no address says so and shows nothing, because there is no warning strong enough
         # to make invented rows safe to look at.
-        return [], 0, "", ("NOT LIVE: this deployment has no address to read from: "
+        return [], None, "", ("NOT LIVE: this deployment has no address to read from: "
                            "public/config.json "
                            "beside this app carries no board_repo, so nothing here is live and "
                            "nothing here is sample data either. Step 5/7 of the installer writes "
@@ -109,7 +114,7 @@ def load():
         # who glances at that learns that Optum and TCS have answers pending, which is a lie with
         # a warning attached. So: an address that is configured and fails is reported as such,
         # with zero rows, and the sample is only ever shown when there is no address at all.
-        return ([], 0, "", "the published board could not be read (%s: %s). This page shows no "
+        return ([], None, "", "the published board could not be read (%s: %s). This page shows no "
                            "sample data, because a fake row you might believe is worse than an "
                            "empty one. On the laptop run tools\\publish_local.py --commit; if the "
                            "payload exists in the private repo this heals itself in a minute."
@@ -124,10 +129,24 @@ def _short(url: str) -> str:
     return u if len(u) <= 96 else "..." + u[-93:]
 
 
+def _count(value):
+    """The published count, or None when the payload carries none.
+
+    The old parse coerced that field with "or 0", which made an absent value, a null, and a
+    counted zero the same 0 on the only screen he checks. The publisher writes null when it had no ledger to read, so
+    the page has to be able to say "not counted" instead of reporting a job market of zero. A
+    value that is not a number is also None, never a guess.
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    text = str(value).strip()
+    return int(text) if text.isdigit() else None
+
+
 def _parse(raw: str):
     d = json.loads(raw)
     return ((d.get("applications") or []),
-            int(d.get("open_jobs_count") or 0),
+            _count(d.get("open_jobs_count")),
             str(d.get("generated") or ""),
             # absent in a blob published before the queue travelled: an empty waiting
             # list, which is the honest reading, not a zero invented here
@@ -214,6 +233,21 @@ def table_config() -> dict:
              "Blank means no PDF was published for that row.")}
 
 
+def open_tile(open_jobs):
+    """The tile's value: the published number, or words that say why there is none."""
+    return "not counted" if open_jobs is None else open_jobs
+
+
+def _now_ist() -> dt.datetime:
+    """His wall clock, not the container's.
+
+    A bare datetime.now() printed 06:48 beside a payload stamped 12:18 IST, which read as a
+    page five hours stale on the evening it was published. Every clock on this page goes
+    through here so the footer and the age line cannot disagree about the zone.
+    """
+    return dt.datetime.now(IST)
+
+
 def _age_hours(generated: str):
     """Hours between the payload's own stamp and now, in the publisher's clock.
 
@@ -223,7 +257,6 @@ def _age_hours(generated: str):
     is made in IST and the container's timezone never enters it. Unparseable stamp returns None,
     which the footer reads as "age unknown" instead of inventing an age.
     """
-    IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
     try:
         then = dt.datetime.strptime(generated.strip(), "%Y-%m-%d %H:%M IST")
     except (ValueError, AttributeError):
@@ -280,7 +313,7 @@ def main() -> None:
                 unsafe_allow_html=True)
 
     sm = tiles(shown, pend)
-    sm["open jobs found"] = open_jobs
+    sm["open jobs found"] = open_tile(open_jobs)
     c = st.columns(7)
     for i, (label, key) in enumerate([("applications", "tracked applications"),
                                       ("this week", "applied this week"),
@@ -327,14 +360,14 @@ def main() -> None:
                    "company, role, status, dates, coverage, and a resume link that only opens "
                    "for you.")
 
-    st.caption("Last rendered %s" % dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    st.caption("Last rendered %s" % _now_ist().strftime("%Y-%m-%d %H:%M:%S IST"))
 
 
 if __name__ == "__main__":
     if "--smoke" in sys.argv:
         apps, open_jobs, generated, note, pend = load()
         sm = tiles(apps, pend)
-        sm["open jobs found"] = open_jobs        # same fill main() does, so the two cannot drift
+        sm["open jobs found"] = open_tile(open_jobs)   # same fill main() does: no drift
         print(json.dumps({"rows": len(apps), "open_jobs": open_jobs, "pending": len(pend),
                           "generated": generated, "note": note,
                           "tiles": sm}, indent=2))

@@ -317,8 +317,26 @@ def pending(path: str = QUEUE_MIRROR, limit: int = 12) -> list[dict]:
     return out[:limit]
 
 
-def _as_count(x) -> int:
-    """Accept the number, or the list someone counted by hand.
+def _num(x) -> str:
+    """A count for a terminal: the number, or words that say nobody counted it.
+
+    "%d" on None is a TypeError in exactly the case where a report matters most, and printing 0
+    instead would state a fact about the job market that was never observed. "not counted" is the
+    same wording the hosted page uses, so one number never reads two different ways.
+    """
+    return "not counted" if x is None else str(x)
+
+
+def _open_phrase(x) -> str:
+    """The open-jobs part of a sentence, so "0 applications, not counted open jobs" cannot happen."""
+    return "%d open jobs" % x if x is not None else "no open-jobs count (the ledger was not read)"
+
+
+def _as_count(x) -> int | None:
+    """Accept the number, or the list someone counted by hand, and let "never counted" pass.
+
+    None is not coerced to 0. Every caller that formats this for a human prints "unknown"
+    instead, because a zero on a public page reads as a fact about the job market.
 
     The published figure is a COUNT, and `len(open_jobs(...))` used to be how it was made.
     That made the page's number depend on the list's filters and its 200-row cap, so a ledger
@@ -326,6 +344,8 @@ def _as_count(x) -> int:
     ledger of 400 would publish 200. metrics.open_jobs() is the definition the desktop report
     already uses; taking its number is what stops the two screens disagreeing.
     """
+    if x is None:
+        return None
     if isinstance(x, int):
         return x
     return len(x or [])
@@ -436,6 +456,8 @@ def main() -> int:
     ap.add_argument("--resume-dir", default="",
                     help="where resumes/a/<id>.pdf live; empty means the repo's own resumes/")
     ap.add_argument("--emit-fields", action="store_true")
+    ap.add_argument("--emit-counts", default="",
+                    help="print rows/open/waiting as GITHUB_ENV assignments for the workflow")
     a = ap.parse_args()
 
     if a.resume_dir:
@@ -471,6 +493,21 @@ def main() -> int:
         print("scanned %s: clean (%d B)" % (a.scan, len(body)))
         return 0
 
+    if a.emit_counts:
+        # The workflow used to read the payload with three `python -c` one-liners inside YAML.
+        # That is a second definition of the published schema, living where no test runs, and it
+        # is how a null count reached his run summary as the word "None". One reader, here, with
+        # the same _num() the terminal report uses, so "not counted" is decided once.
+        with open(a.emit_counts, encoding="utf-8") as fh:
+            d = json.load(fh)
+        if not isinstance(d, dict):
+            print("REFUSING: %s is not a payload object" % a.emit_counts, file=sys.stderr)
+            return 1
+        print("rows=%d" % len(d.get("applications") or []))
+        print("open=%s" % _num(d.get("open_jobs_count")))
+        print("waiting=%d" % len(d.get("pending") or []))
+        return 0
+
     if a.emit_fields:
         print(json.dumps({"applications": list(APP_FIELDS) + ["resume_blob"],
                           "open_jobs": list(JOB_FIELDS) + ["location", "source"],
@@ -483,18 +520,26 @@ def main() -> int:
         # numbers printed are read back out of that file, so --check tells him what the page
         # will say rather than what a rebuild would have said.
         payload = load_payload(a.payload)
+        published = payload.get("open_jobs_count")
         counts = (len(payload.get("applications") or []),
-                  int(payload.get("open_jobs_count") or 0),
+                  _as_count(published) if published is not None else None,
                   len(payload.get("pending") or []))
         made = "payload"
     else:
         rows = applications(a.tracker)
-        open_count = metrics.open_jobs(metrics.read_ledger(a.seen))
+        # A runner with no ledger publishes null, not 0. job_scraper/seen_jobs.json is
+        # gitignored, so when board.yml falls back to building here the checkout holds no
+        # postings at all, and the page printed "0 open jobs found" for a count nobody took.
+        # That is what his board read at 2026-09-02 00:55 IST: not "you have no leads", but
+        # "the laptop's --commit never landed and this runner cannot see the ledger". Absence
+        # is not zero, so the payload carries null and the page says it was not counted.
+        open_count = (metrics.open_jobs(metrics.read_ledger(a.seen))
+                      if os.path.exists(a.seen) else None)
         pend = pending(a.queue)
         payload = board(rows, open_count, pend)
         counts = (len(rows), open_count, len(pend))
         made = "fallback"
-        if a.limit != 200 and open_count > a.limit:
+        if open_count is not None and a.limit != 200 and open_count > a.limit:
             print("note: --limit is not applied to the published open-jobs figure. It is a "
                   "count over the whole ledger (%d open), because capping it at %d is how a "
                   "page comes to read 200 for 400." % (open_count, a.limit), file=sys.stderr)
@@ -507,8 +552,8 @@ def main() -> int:
             print("   leak ->", p, file=sys.stderr)
         return 1
     if a.check:
-        print("clean: %d applications, %d open jobs, %d waiting on you, %d B,"
-              " nothing on the blocklist [%s]" % (counts[0], counts[1], counts[2],
+        print("clean: %d applications, %s, %d waiting on you, %d B,"
+              " nothing on the blocklist [%s]" % (counts[0], _open_phrase(counts[1]), counts[2],
                                                   len(text), made))
         return 0
     if not a.out:
@@ -526,8 +571,8 @@ def main() -> int:
               file=sys.stderr)
         return 1
     os.replace(tmp, a.out)
-    print("wrote %s: %d applications, %d open jobs, %d waiting on you, %d B [%s]"
-          % (a.out, counts[0], counts[1], counts[2], len(text), made))
+    print("wrote %s: %d applications, %s, %d waiting on you, %d B [%s]"
+          % (a.out, counts[0], _open_phrase(counts[1]), counts[2], len(text), made))
     return 0
 
 
