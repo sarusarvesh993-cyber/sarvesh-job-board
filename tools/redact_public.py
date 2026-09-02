@@ -262,8 +262,20 @@ def open_jobs(path: str = SEEN, limit: int = 200) -> list[dict]:
             if known in src:
                 rec["source"] = known
                 break
-        if rec.get("company") and rec.get("title"):
-            out.append(rec)
+        # The identity fields arrive under more than one name: linkedin_jobs.py writes
+        # `title`, the board scrapers and the skill-written entries use `role`, and `company`
+        # can be `organisation`. An alias missed is postings silently not counted, which is
+        # how 165 open jobs became a tile saying 0 on his page.
+        title = (v.get("title") or v.get("role") or v.get("job_title") or "").strip()
+        comp = (v.get("company") or v.get("organisation") or v.get("org") or "").strip()
+        if title:
+            rec["title"] = title
+        if comp:
+            rec["company"] = comp
+        # No "must have both to count" gate here. This list's only published use is its
+        # LENGTH, and a posting he could act on later is still a posting that is open now.
+        # The private ledger is where the identity lives; the public payload gets a number.
+        out.append(rec)
     out.sort(key=lambda r: r.get("date", ""), reverse=True)
     return out[:limit]
 
@@ -305,7 +317,21 @@ def pending(path: str = QUEUE_MIRROR, limit: int = 12) -> list[dict]:
     return out[:limit]
 
 
-def board(rows: list[dict], seen: list[dict], pend: list[dict] | None = None) -> dict:
+def _as_count(x) -> int:
+    """Accept the number, or the list someone counted by hand.
+
+    The published figure is a COUNT, and `len(open_jobs(...))` used to be how it was made.
+    That made the page's number depend on the list's filters and its 200-row cap, so a ledger
+    of 165 open postings could publish 0 (a field name the redactor did not alias) and a
+    ledger of 400 would publish 200. metrics.open_jobs() is the definition the desktop report
+    already uses; taking its number is what stops the two screens disagreeing.
+    """
+    if isinstance(x, int):
+        return x
+    return len(x or [])
+
+
+def board(rows: list[dict], seen, pend: list[dict] | None = None) -> dict:
     """The whole publish payload, and deliberately tiny.
 
     No `stats` key. An earlier version published tiles computed here, which meant the
@@ -315,6 +341,10 @@ def board(rows: list[dict], seen: list[dict], pend: list[dict] | None = None) ->
     so tile and table are the same arithmetic over the same rows or the page is broken
     for everyone at once, never quietly.
 
+    `seen` is the open-jobs COUNT (metrics.open_jobs), not a redacted list: a list's
+    filters and its cap would quietly redefine the number, which is exactly what happened
+    between his desktop report (165) and the hosted tile (0).
+
     Only a COUNT of open jobs is published, not the list: a public list of what you
     found is a public list of what you are hunting for, and it is a free job feed for
     anyone who crawls the blob. The names live in the private dashboard.
@@ -323,7 +353,7 @@ def board(rows: list[dict], seen: list[dict], pend: list[dict] | None = None) ->
         "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M IST"),
         "schema": 1,
         "applications": rows,
-        "open_jobs_count": len(seen),
+        "open_jobs_count": _as_count(seen),
         "pending": pend or [],
     }
 
@@ -449,19 +479,26 @@ def main() -> int:
 
     if payload_ready(a.payload):
         # See the payload-first rule at the top of this file: on a runner this is the only
-        # path that can carry rows, and it is scanned again right here, not trusted.
-        payload, rows, jobs, pend, made = load_payload(a.payload), [], [], [], "payload"
+        # path that can carry rows, and it is scanned again right here, not trusted. The
+        # numbers printed are read back out of that file, so --check tells him what the page
+        # will say rather than what a rebuild would have said.
+        payload = load_payload(a.payload)
+        counts = (len(payload.get("applications") or []),
+                  int(payload.get("open_jobs_count") or 0),
+                  len(payload.get("pending") or []))
+        made = "payload"
     else:
         rows = applications(a.tracker)
-        jobs = open_jobs(a.seen, a.limit)
+        open_count = metrics.open_jobs(metrics.read_ledger(a.seen))
         pend = pending(a.queue)
-        payload = board(rows, jobs, pend)
+        payload = board(rows, open_count, pend)
+        counts = (len(rows), open_count, len(pend))
         made = "fallback"
+        if a.limit != 200 and open_count > a.limit:
+            print("note: --limit is not applied to the published open-jobs figure. It is a "
+                  "count over the whole ledger (%d open), because capping it at %d is how a "
+                  "page comes to read 200 for 400." % (open_count, a.limit), file=sys.stderr)
     text = json.dumps(payload, indent=1, ensure_ascii=False)
-    counts = (len(payload.get("applications") or []),
-              int(payload.get("open_jobs_count") or 0),
-              len(payload.get("pending") or [])) if made == "payload" else (len(rows),
-                                                                            len(jobs), len(pend))
     problems = scan(text, a.profile)
 
     if problems:

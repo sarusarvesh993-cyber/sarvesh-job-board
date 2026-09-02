@@ -33,12 +33,13 @@ from tools import agent_board                               # noqa: E402
 
 # --- where the public page reads from. A path, or a URL. No credentials anywhere. ----
 # A previous build baked one GitHub login into these two defaults. It is correct for exactly one
-# person and silently wrong for everyone else: on streamlit.app the fetch 404s, load() falls back
-# to the sample, and the page shows SAMPLE DATA forever while everything on GitHub looks healthy.
-# So the slug comes from the config.json that is deployed INTO the public repo beside this app,
+# person and silently wrong for everyone else: on streamlit.app a 404 used to mean "render
+# public/board.sample.json under a warning", which on 2026-09-02 put nine invented applications on
+# his page while every GitHub check was green. There is no fallback to the sample any more and no
+# path to it from this file: the constant is gone, so re-adding one is a compile error rather than
+# a feature. The slug comes from the config.json deployed INTO the public repo beside this app,
 # which the installer writes, and an env var still wins for a local run.
 HERE = os.path.dirname(os.path.abspath(__file__))
-SAMPLE = os.path.join(HERE, "public", "board.sample.json")
 FETCH_SECONDS = 12
 
 
@@ -86,13 +87,17 @@ def load():
     """(rows, open_jobs_count, generated, note, pending). Never raises: a public page
     whose blob is unreachable must say what it fell back to, not show a stack trace."""
     if not BLOB_URL:
-        if not os.path.exists(SAMPLE):
-            return [], 0, "", "no board.json on this host and no public/config.json board_repo " \
-                              "to say where to look", []
-        rows, open_jobs, generated, pend = _parse(open(SAMPLE, encoding="utf-8").read())
-        return (rows, open_jobs, generated,
-                "NOT LIVE: public/config.json in this repo has no board_repo, so this page has no "
-                "address to read from. Run the installer again; step 5 writes it.", pend)
+        # No address at all used to mean "render public/board.sample.json and label it NOT
+        # LIVE". On 2026-09-02 that label did not save it: his setup step republished a config
+        # without board_repo, so the live page displayed nine fabricated applications, and the
+        # banner was one line he had to notice while the tiles looked like a busy week. A page
+        # with no address says so and shows nothing, because there is no warning strong enough
+        # to make invented rows safe to look at.
+        return [], 0, "", ("NOT LIVE: this deployment has no address to read from: "
+                           "public/config.json "
+                           "beside this app carries no board_repo, so nothing here is live and "
+                           "nothing here is sample data either. Step 5/7 of the installer writes "
+                           "that field; re-paste the install block if this appears."), []
     try:
         raw = _read_url(BLOB_URL)
     except Exception as e:                                 # noqa: BLE001
@@ -296,6 +301,11 @@ def main() -> None:
         st.info("Your filters hid all %d published rows. The status list and the contains box "
                 "are the only filters on this page; clear them and the list comes back. Nothing "
                 "was unpublished." % len(apps))
+    elif not shown and note:
+        # The warning above already states what is wrong, and it is the only thing that can be
+        # said: on a page with no address, "nothing published yet" would be a guess about a
+        # payload this app never tried to read.
+        pass
     elif not shown and not note and generated:
         st.info("Published at %s, and that payload holds zero rows. The page is working, so the "
                 "open question is what the tracker had to publish. On the laptop run "
