@@ -1,7 +1,21 @@
 {
- "generated": "2026-09-03 13:28 IST",
+ "generated": "2026-09-03 13:50 IST",
  "schema": 1,
- "applications": [],
- "open_jobs_count": 311,
+ "applications": [
+  {
+   "date_applied": "2026-09-03",
+   "company": "Zywave",
+   "role": "Product Analyst",
+   "track": "hybrid",
+   "format": "india",
+   "channel": "careers-page",
+   "status": "applied",
+   "last_touch": "2026-09-03",
+   "coverage_pct": "100.0",
+   "fit_verdict": "MIXED",
+   "resume_blob": "a/c662536006"
+  }
+ ],
+ "open_jobs_count": 327,
  "pending": []
 }
