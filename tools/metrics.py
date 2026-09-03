@@ -158,6 +158,28 @@ def read_ledger(path):
     return seen
 
 
+def stamp_label(raw) -> str:
+    """Render a scrape-run stamp with the zone it carries, or admit that it never said.
+
+    A `runs/latest.json` can be written by a runner whose clock is UTC and read on a laptop in
+    Telangana. Until -45 the value was written as `datetime.now().isoformat()` with no offset, so
+    one laptop printed `last scrape: 2026-09-03T06:16` beside a ledger whose own mtime said 12:28:
+    both correct, and the reader forced to guess which clock produced the first. Guessing is what
+    turned a two-day-old archive into "no jobs out there" once already. So: new stamps carry an
+    offset, and an old stamp is labelled as unknown instead of silently assumed to be local.
+    """
+    txt = str(raw or "").strip()
+    if not txt:
+        return ""
+    try:
+        d = dt.datetime.fromisoformat(txt)
+    except ValueError:
+        return txt[:16].replace("T", " ") + " (unreadable stamp)"
+    if d.tzinfo is None:
+        return d.strftime("%Y-%m-%d %H:%M") + " (no zone recorded when written)"
+    return d.astimezone(IST).strftime("%Y-%m-%d %H:%M") + " IST"
+
+
 def ledger_facts(path) -> dict:
     """The file behind the open-jobs number: where it is, how big, how fresh, how many,
     and what went wrong if it will not parse. Printed beside every count, so a zero can be
@@ -279,7 +301,7 @@ def numbers(rows, seen=None, latest_path=None, today=None, pending=None) -> dict
     if latest_path and os.path.exists(latest_path):
         try:
             with open(latest_path, encoding="utf-8") as fh:
-                out["last scrape"] = str(json.load(fh).get("generated", ""))[:16]
+                out["last scrape"] = stamp_label(json.load(fh).get("generated", ""))
         except Exception:                                        # noqa: BLE001
             out["last scrape"] = ""
     return out
