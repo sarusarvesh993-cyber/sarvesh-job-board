@@ -370,7 +370,9 @@ def board(rows: list[dict], seen, pend: list[dict] | None = None) -> dict:
     anyone who crawls the blob. The names live in the private dashboard.
     """
     return {
-        "generated": dt.datetime.now().strftime("%Y-%m-%d %H:%M IST"),
+        # The offset, not the container clock: this line is read as a promise about
+        # freshness, and "IST" computed on a UTC runner would be a lie with a stamp on it.
+        "generated": metrics.now_ist("%Y-%m-%d %H:%M IST"),
         "schema": 1,
         "applications": rows,
         "open_jobs_count": _as_count(seen),
@@ -553,8 +555,9 @@ def main() -> int:
         return 1
     if a.check:
         print("clean: %d applications, %s, %d waiting on you, %d B,"
-              " nothing on the blocklist [%s]" % (counts[0], _open_phrase(counts[1]), counts[2],
-                                                  len(text), made))
+              " nothing on the blocklist [%s] (%s)"
+              % (counts[0], _open_phrase(counts[1]), counts[2], len(text), made,
+                 metrics.facts_line(a.seen)))
         return 0
     if not a.out:
         print(text)

@@ -107,16 +107,92 @@ def response_rate(rows) -> float:
     return (100.0 * replies(rows) / len(rows)) if rows else 0.0
 
 
-def read_ledger(path):
-    """The scrape ledger: {"seen": {key: {...}}}. Missing or corrupt reads as empty,
-    never as a crash - a broken ledger means zero open jobs, not a dead dashboard."""
-    if not path or not os.path.exists(path):
-        return {}
+def read_ledger_checked(path):
+    """(seen, problem) - the ledger, plus the reason it could not be read.
+
+    `read_ledger` below has always swallowed a corrupt or locked file and returned {}, which
+    is right for a view and deadly for a writer: for two days every screen said "0 open jobs"
+    because the ledger was unreadable, and not one of them said that was why. This is the
+    version that keeps the difference between an empty market and a broken file.
+    """
+    if not path:
+        return {}, ""
+    if not os.path.exists(path):
+        return {}, ""
     try:
         with open(path, encoding="utf-8") as fh:
-            return (json.load(fh) or {}).get("seen", {}) or {}
-    except Exception:                                        # noqa: BLE001
-        return {}
+            d = json.load(fh) or {}
+    except Exception as e:                                    # noqa: BLE001
+        return {}, "%s: %s" % (type(e).__name__, e)
+    if not isinstance(d, dict):
+        return {}, "the ledger is a %s, not an object" % type(d).__name__
+    seen = d.get("seen", {})
+    if not isinstance(seen, dict):
+        return {}, "`seen` is a %s, not an object" % type(seen).__name__
+    return seen, ""
+
+
+IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
+
+
+def now_ist(fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Now, in the one time zone this project prints, computed from an offset instead of from
+    the machine's own clock.
+
+    `dt.datetime.now().strftime("%H:%M IST")` is true on a laptop in Telangana and five and a
+    half hours wrong on a GitHub runner, whose clock is UTC - and the label travels with the
+    number, so the reader has no way to find out. That is the same defect as the page footer that
+    printed container UTC next to a payload stamped IST and looked stale while being two minutes
+    old. Anything that carries an `IST` suffix in this repo calls this instead.
+    """
+    return dt.datetime.now(IST).strftime(fmt)
+
+
+def read_ledger(path):
+    """The scrape ledger: {"seen": {key: {...}}}. Missing or corrupt reads as empty,
+    never as a crash - a broken ledger means zero open jobs, not a dead dashboard.
+    A writer must call read_ledger_checked() instead: for a write, "empty" is a lie that
+    then gets saved to disk.
+    """
+    seen, _ = read_ledger_checked(path)
+    return seen
+
+
+def ledger_facts(path) -> dict:
+    """The file behind the open-jobs number: where it is, how big, how fresh, how many,
+    and what went wrong if it will not parse. Printed beside every count, so a zero can be
+    checked against a byte count instead of argued about.
+    """
+    facts = {"path": os.path.abspath(path) if path else "", "exists": False, "bytes": 0,
+             "mtime": "", "entries": 0, "open": 0, "parse_error": ""}
+    if not path:
+        facts["parse_error"] = "no ledger path given"
+        return facts
+    if not os.path.exists(path):
+        facts["parse_error"] = "file absent"
+        return facts
+    st = os.stat(path)
+    seen, problem = read_ledger_checked(path)
+    facts.update({"exists": True, "bytes": st.st_size,
+                  "mtime": dt.datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                  "entries": len(seen), "open": open_jobs(seen), "parse_error": problem})
+    return facts
+
+
+def facts_line(path) -> str:
+    """The one-line form of ledger_facts, for the tools that print sentences, not JSON.
+
+    The path leads rather than trails, because the question it answers first is "which folder
+    made this number" - two workspaces on one laptop, each with its own ledger, is what turned
+    "0 open jobs" into a two-day investigation.
+    """
+    f = ledger_facts(path)
+    where = f["path"] or "not set"
+    if not f["exists"]:
+        return "ledger: %s (%s)" % (where, f["parse_error"] or "absent")
+    tail = ", UNPARSABLE: " + f["parse_error"] if f["parse_error"] else ""
+    return "ledger: %s - %d entries, %d B, written %s%s" % (
+        where, f["entries"], f["bytes"], f["mtime"], tail)
 
 
 def is_open(entry) -> bool:
